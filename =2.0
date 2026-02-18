@@ -1,0 +1,12 @@
+Requirement already satisfied: pydantic[email] in ./env/lib/python3.10/site-packages (2.12.5)
+Requirement already satisfied: annotated-types>=0.6.0 in ./env/lib/python3.10/site-packages (from pydantic[email]) (0.7.0)
+Requirement already satisfied: pydantic-core==2.41.5 in ./env/lib/python3.10/site-packages (from pydantic[email]) (2.41.5)
+Requirement already satisfied: typing-extensions>=4.14.1 in ./env/lib/python3.10/site-packages (from pydantic[email]) (4.15.0)
+Requirement already satisfied: typing-inspection>=0.4.2 in ./env/lib/python3.10/site-packages (from pydantic[email]) (0.4.2)
+Collecting email-validator>=2.0.0 (from pydantic[email])
+  Using cached email_validator-2.3.0-py3-none-any.whl.metadata (26 kB)
+Requirement already satisfied: dnspython>=2.0.0 in ./env/lib/python3.10/site-packages (from email-validator>=2.0.0->pydantic[email]) (2.8.0)
+Requirement already satisfied: idna>=2.0.0 in ./env/lib/python3.10/site-packages (from email-validator>=2.0.0->pydantic[email]) (3.11)
+Using cached email_validator-2.3.0-py3-none-any.whl (35 kB)
+Installing collected packages: email-validator
+Successfully installed email-validator-2.3.0
