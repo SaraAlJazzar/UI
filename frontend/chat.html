@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>محادثة Gemini</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/frontend/css/common.css">
+    <link rel="stylesheet" href="/frontend/css/chat.css">
+</head>
+<body>
+
+    <!-- Sidebar overlay panel (hidden by default) -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>المحادثات</h2>
+            <button class="new-chat-btn" id="newChatBtn" title="محادثة جديدة">
+                <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                جديدة
+            </button>
+        </div>
+        <div class="sidebar-list" id="sessionList">
+            <div class="sidebar-empty" id="sidebarEmpty">
+                <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+                <p>لا توجد محادثات سابقة</p>
+            </div>
+        </div>
+    </aside>
+
+    <div class="chat-wrapper">
+
+        <!-- Top bar -->
+        <div class="chat-topbar">
+            <!-- History button (right side in RTL) -->
+            <button class="history-btn" id="historyToggle" title="المحادثات السابقة">
+                <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+            </button>
+            <div class="topbar-info">
+                <h1>محادثة مع <span>Gemini</span></h1>
+                <p>اسأل أي سؤال واحصل على إجابة فورية</p>
+            </div>
+            <!-- Menu button (left side in RTL) -->
+            <div class="menu-dropdown" id="menuDropdown">
+                <button class="menu-btn" onclick="document.getElementById('menuDropdown').classList.toggle('open')" title="القائمة">
+                    <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+                </button>
+                <div class="menu-list">
+                    <a href="/" class="menu-item">
+                        <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+                        الصفحة الرئيسية
+                    </a>
+                    <a href="/rag-page" class="menu-item">
+                        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+                        البحث الطبي الذكي
+                    </a>
+                    <a href="/chat-page" class="menu-item active">
+                        <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+                        محادثة Gemini
+                    </a>
+                    <div class="menu-divider"></div>
+                    <a href="#" class="menu-item menu-item-settings" onclick="event.preventDefault(); document.getElementById('menuDropdown').classList.remove('open'); openSettings();">
+                        <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+                        الإعدادات
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Panel -->
+        <div class="settings-overlay" id="settingsOverlay"></div>
+        <div class="settings-panel" id="settingsPanel">
+            <div class="settings-header">
+                <h2>الإعدادات</h2>
+                <button class="settings-close" id="settingsClose">
+                    <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+            </div>
+
+            <div class="settings-body">
+                <div class="settings-group">
+                    <label class="settings-label" for="apiKeyInput">
+                        <svg viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+                        مفتاح Gemini API
+                    </label>
+                    <input type="password" id="apiKeyInput" class="settings-input" placeholder="اتركه فارغاً لاستخدام المفتاح الافتراضي" dir="ltr">
+                    <span class="settings-hint">يمكنك الحصول على مفتاح من <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a></span>
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label" for="modelSelect">
+                        <svg viewBox="0 0 24 24"><path d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0-3.5-3.47-3.5-9.11 0-12.58 3.51-3.47 9.14-3.49 12.65-.06L21 3v7.12z"/></svg>
+                        نموذج Gemini
+                    </label>
+                    <select id="modelSelect" class="settings-select">
+                        <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite (سريع)</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (متوازن)</option>
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash (ذكي)</option>
+                        <option value="gemini-2.5-pro">Gemini 2.5 Pro (الأقوى)</option>
+                    </select>
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label" for="langSelect">
+                        <svg viewBox="0 0 24 24"><path d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0014.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>
+                        لغة الرد
+                    </label>
+                    <select id="langSelect" class="settings-select">
+                        <option value="ar">العربية</option>
+                        <option value="en">English</option>
+                        <option value="fr">Français</option>
+                        <option value="es">Español</option>
+                        <option value="tr">Türkçe</option>
+                        <option value="de">Deutsch</option>
+                    </select>
+                    <span class="settings-hint">اللغة التي سيرد بها النموذج على رسائلك</span>
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label" for="contextRange">
+                        <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+                        عدد رسائل السياق
+                    </label>
+                    <div class="range-wrapper">
+                        <input type="range" id="contextRange" class="settings-range" min="0" max="20" value="4">
+                        <div class="range-info">
+                            <span id="contextValue" class="range-value">4</span>
+                            <span class="range-label">رسالة</span>
+                        </div>
+                    </div>
+                    <span class="settings-hint">عدد الرسائل السابقة التي ستُرسل للنموذج ليتذكر سياق المحادثة. (0 = بدون ذاكرة)</span>
+                </div>
+            </div>
+
+            <div class="settings-footer">
+                <button class="settings-save" id="settingsSave">حفظ الإعدادات</button>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="chat-messages" id="chatMessages">
+            <div class="chat-empty" id="chatEmpty">
+                <div class="chat-empty-icon">
+                    <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+                </div>
+                <h2>ابدأ المحادثة</h2>
+                <p>اكتب سؤالك أدناه وسيجيبك Gemini AI فوراً. يمكنك السؤال عن أي موضوع طبي أو عام.</p>
+            </div>
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="msg-avatar">
+                    <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+                </div>
+                <div class="typing-dots">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input -->
+        <div class="chat-input-area">
+            <form class="chat-input-form" id="chatForm">
+                <div class="lang-picker" id="langPicker">
+                    <button type="button" class="lang-picker-btn" id="langPickerBtn" title="لغة الرد">
+                        <svg viewBox="0 0 24 24"><path d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0014.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>
+                        <span id="langPickerLabel">AR</span>
+                    </button>
+                    <div class="lang-picker-dropdown" id="langPickerDropdown">
+                        <button type="button" class="lang-option active" data-lang="ar" data-label="AR">العربية</button>
+                        <button type="button" class="lang-option" data-lang="en" data-label="EN">English</button>
+                        <button type="button" class="lang-option" data-lang="fr" data-label="FR">Français</button>
+                        <button type="button" class="lang-option" data-lang="es" data-label="ES">Español</button>
+                        <button type="button" class="lang-option" data-lang="tr" data-label="TR">Türkçe</button>
+                        <button type="button" class="lang-option" data-lang="de" data-label="DE">Deutsch</button>
+                    </div>
+                </div>
+                <textarea id="chatInput" class="chat-input" placeholder="اكتب رسالتك هنا..." rows="1"></textarea>
+                <button type="submit" class="chat-send-btn" id="sendBtn">
+                    <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+            </form>
+        </div>
+
+    </div>
+
+    <script src="/frontend/js/common.js"></script>
+    <script src="/frontend/js/chat.js"></script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>المساعد الطبي الذكي</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/frontend/css/common.css">
+    <link rel="stylesheet" href="/frontend/css/home.css">
+</head>
+<body>
+    <!-- Menu dropdown -->
+    <div class="menu-dropdown" id="menuDropdown">
+        <button class="menu-btn" onclick="document.getElementById('menuDropdown').classList.toggle('open')" title="القائمة">
+            <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+            <span>القائمة</span>
+        </button>
+        <div class="menu-list">
+            <a href="/" class="menu-item active">
+                <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+                الصفحة الرئيسية
+            </a>
+            <a href="/rag-page" class="menu-item">
+                <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+                البحث الطبي الذكي
+            </a>
+            <a href="/chat-page" class="menu-item">
+                <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+                محادثة Gemini
+            </a>
+            <div class="menu-divider"></div>
+            <a href="#" class="menu-item menu-item-settings" onclick="event.preventDefault(); document.getElementById('menuDropdown').classList.remove('open'); openSettings();">
+                <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+                الإعدادات
+            </a>
+        </div>
+    </div>
+
+    <!-- Settings Overlay & Panel -->
+    <div class="settings-overlay" id="settingsOverlay"></div>
+    <div class="settings-panel" id="settingsPanel">
+        <div class="settings-header">
+            <h2>الإعدادات</h2>
+            <button class="settings-close" id="settingsClose">
+                <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
+        </div>
+        <div class="settings-body">
+            <div class="settings-group">
+                <label class="settings-label" for="apiKeyInput">
+                    <svg viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+                    مفتاح Gemini API
+                </label>
+                <input type="password" id="apiKeyInput" class="settings-input" placeholder="اتركه فارغاً لاستخدام المفتاح الافتراضي" dir="ltr">
+                <span class="settings-hint">يمكنك الحصول على مفتاح من <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a></span>
+            </div>
+            <div class="settings-group">
+                <label class="settings-label" for="modelSelect">
+                    <svg viewBox="0 0 24 24"><path d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0-3.5-3.47-3.5-9.11 0-12.58 3.51-3.47 9.14-3.49 12.65-.06L21 3v7.12z"/></svg>
+                    نموذج Gemini
+                </label>
+                <select id="modelSelect" class="settings-select">
+                    <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite (سريع)</option>
+                    <option value="gemini-2.0-flash">Gemini 2.0 Flash (متوازن)</option>
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash (ذكي)</option>
+                    <option value="gemini-2.5-pro">Gemini 2.5 Pro (الأقوى)</option>
+                </select>
+            </div>
+            <div class="settings-group">
+                <label class="settings-label" for="contextRange">
+                    <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+                    عدد رسائل السياق (المحادثة)
+                </label>
+                <div class="range-wrapper">
+                    <input type="range" id="contextRange" class="settings-range" min="0" max="20" value="4">
+                    <div class="range-info">
+                        <span id="contextValue" class="range-value">4</span>
+                        <span class="range-label">رسالة</span>
+                    </div>
+                </div>
+                <span class="settings-hint">عدد الرسائل السابقة التي ستُرسل للنموذج ليتذكر سياق المحادثة. (0 = بدون ذاكرة)</span>
+            </div>
+        </div>
+        <div class="settings-footer">
+            <button class="settings-save" id="settingsSave">حفظ الإعدادات</button>
+        </div>
+    </div>
+
+    <div class="menu-container">
+        <div class="menu-header">
+            <div class="menu-logo">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+            </div>
+            <h1>المساعد <span>الطبي</span> الذكي</h1>
+            <p>اختر الخدمة التي تريد استخدامها</p>
+        </div>
+
+        <div class="menu-grid">
+            <!-- RAG Card -->
+            <a href="/rag-page" class="menu-card">
+                <div class="menu-card-icon rag-icon">
+                    <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+                </div>
+                <div class="menu-card-body">
+                    <h2>البحث الطبي الذكي</h2>
+                    <p>ابحث في مصادر طبية موثوقة واحصل على إجابات مدعومة بالذكاء الاصطناعي مع إمكانية المقارنة بين المصادر</p>
+                </div>
+                <div class="menu-card-tags">
+                    <span class="tag">RAG</span>
+                    <span class="tag">Gemini AI</span>
+                    <span class="tag">مقارنة مصادر</span>
+                </div>
+                <div class="menu-card-arrow">
+                    <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+                </div>
+            </a>
+
+            <!-- Chat Card -->
+            <a href="/chat-page" class="menu-card">
+                <div class="menu-card-icon chat-icon">
+                    <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+                </div>
+                <div class="menu-card-body">
+                    <h2>محادثة مع Gemini</h2>
+                    <p>تحدث مباشرة مع نموذج Gemini AI واطرح أي سؤال طبي أو عام واحصل على إجابات فورية</p>
+                </div>
+                <div class="menu-card-tags">
+                    <span class="tag">محادثة</span>
+                    <span class="tag">Gemini AI</span>
+                    <span class="tag">فوري</span>
+                </div>
+                <div class="menu-card-arrow">
+                    <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+                </div>
+            </a>
+        </div>
+
+        <div class="menu-footer">
+            مدعوم بـ <a href="https://ai.google.dev" target="_blank">Gemini AI</a>
+        </div>
+    </div>
+
+    <script src="/frontend/js/common.js"></script>
+</body>
+</html>
