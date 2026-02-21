@@ -11,6 +11,7 @@ app.include_router(rag.router, prefix="/rag", tags=["RAG"])
 app.include_router(settings.router, prefix="/settings", tags=["Settings"])
 app.include_router(chat_sessions.router, prefix="/sessions", tags=["Chat Sessions"])
 
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
 
 @app.get("/")

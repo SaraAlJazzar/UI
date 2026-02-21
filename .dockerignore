@@ -1,0 +1,9 @@
+env/
+__pycache__/
+.git/
+.gitignore
+*.pyc
+*.pyo
+.env
+.env.*
+uploads/

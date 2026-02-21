@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+
 from app.database import get_settings_db, SettingsDB
 from app.schemas import SettingsUpdate, SettingsResponse
 
@@ -24,8 +25,7 @@ def get_or_create_settings(db: Session) -> SettingsDB:
 
 @router.get("/", response_model=SettingsResponse)
 def get_settings(db: Session = Depends(get_settings_db)):
-    settings = get_or_create_settings(db)
-    return settings
+    return get_or_create_settings(db)
 
 
 @router.put("/", response_model=SettingsResponse)

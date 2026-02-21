@@ -36,6 +36,9 @@
             <button class="history-btn" id="historyToggle" title="المحادثات السابقة">
                 <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
             </button>
+            <button class="summary-btn" id="summaryBtn" title="ملخص المحادثة" style="display:none">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+            </button>
             <div class="topbar-info">
                 <h1>محادثة مع <span>Gemini</span></h1>
                 <p>اسأل أي سؤال واحصل على إجابة فورية</p>
@@ -155,6 +158,10 @@
 
         <!-- Input -->
         <div class="chat-input-area">
+            <!-- Multi-image preview strip -->
+            <div class="image-preview-strip" id="imagePreviewStrip" style="display:none">
+                <div class="image-preview-list" id="imagePreviewList"></div>
+            </div>
             <form class="chat-input-form" id="chatForm">
                 <div class="lang-picker" id="langPicker">
                     <button type="button" class="lang-picker-btn" id="langPickerBtn" title="لغة الرد">
@@ -170,6 +177,18 @@
                         <button type="button" class="lang-option" data-lang="de" data-label="DE">Deutsch</button>
                     </div>
                 </div>
+                <button type="button" class="upload-btn" id="uploadBtn" title="إرفاق صور">
+                    <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                </button>
+                <input type="file" id="imageInput" accept="image/jpeg,image/png,image/gif,image/webp" multiple style="display:none">
+                <button type="button" class="record-btn" id="recordBtn" title="تسجيل صوتي">
+                    <svg class="mic-icon" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/></svg>
+                    <svg class="stop-icon" viewBox="0 0 24 24" style="display:none"><path d="M6 6h12v12H6z"/></svg>
+                </button>
+                <div class="record-timer" id="recordTimer" style="display:none">
+                    <span class="record-dot"></span>
+                    <span class="record-time" id="recordTime">0:00</span>
+                </div>
                 <textarea id="chatInput" class="chat-input" placeholder="اكتب رسالتك هنا..." rows="1"></textarea>
                 <button type="submit" class="chat-send-btn" id="sendBtn">
                     <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
@@ -177,6 +196,38 @@
             </form>
         </div>
 
+    </div>
+
+    <!-- Summary popup -->
+    <div class="summary-overlay" id="summaryOverlay"></div>
+    <div class="summary-popup" id="summaryPopup">
+        <div class="summary-popup-header">
+            <h2>
+                <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                ملخص المحادثة
+            </h2>
+            <div class="summary-header-actions">
+                <button class="summary-refresh" id="summaryRefresh" title="إعادة توليد الملخص">
+                    <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                </button>
+                <button class="summary-close" id="summaryClose">
+                    <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="summary-popup-body" id="summaryBody">
+            <div class="summary-loading" id="summaryLoading">
+                <div class="typing-dots"><span></span><span></span><span></span></div>
+                <p>جارٍ إنشاء الملخص...</p>
+            </div>
+            <div class="summary-content" id="summaryContent"></div>
+            <div class="summary-meta" id="summaryMeta" style="display:none"></div>
+        </div>
+    </div>
+
+    <!-- Lightbox for full-size image viewing -->
+    <div class="image-lightbox" id="imageLightbox">
+        <img id="lightboxImg" src="" alt="full-size">
     </div>
 
     <script src="/frontend/js/common.js"></script>

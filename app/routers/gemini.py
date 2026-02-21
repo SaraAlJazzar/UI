@@ -1,123 +1,212 @@
-from fastapi import APIRouter, HTTPException, Depends
+import os
+import uuid
+import shutil
+import logging
+from datetime import datetime
+from typing import Optional, List
+
+from fastapi import APIRouter, HTTPException, Depends, Form, File, UploadFile
 from sqlalchemy.orm import Session
 import google.generativeai as genai
-import uuid
-from datetime import datetime
-from app.schemas import ChatRequest, ChatResponse
-from app.config import GEMINI_API_KEY, GEMINI_DEFAULT_MODEL
+
+from app.config import (
+    GEMINI_API_KEY, GEMINI_DEFAULT_MODEL,
+    UPLOAD_DIR, ALLOWED_IMAGE_MIME, ALLOWED_AUDIO_MIME,
+    LANGUAGE_INSTRUCTIONS,
+)
 from app.database import get_settings_db, SettingsDB, chat_sessions_collection, chat_messages_collection
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
-LANGUAGE_INSTRUCTIONS = {
-    "ar": "أجب باللغة العربية فقط.",
-    "en": "Answer in English only.",
-    "fr": "Répondez en français uniquement.",
-    "es": "Responde solo en español.",
-    "tr": "Sadece Türkçe cevap ver.",
-    "de": "Antworte nur auf Deutsch.",
-}
 
-
-@router.post("/chat", response_model=ChatResponse)
-async def chat_with_gpt(request: ChatRequest, db: Session = Depends(get_settings_db)):
-#Depends(get_settings_db) opens a MySQL session to settings_db and injects it as db
-
+@router.post("/chat")
+async def chat_with_gpt(
+    message: str = Form(...),
+    session_id: Optional[str] = Form(None),
+    api_key: Optional[str] = Form(None),
+    model: Optional[str] = Form(None),
+    language: Optional[str] = Form(None),
+    images: List[UploadFile] = File([]),
+    db: Session = Depends(get_settings_db),
+):
     try:
-        api_key = request.api_key or GEMINI_API_KEY
-        model_name = request.model or GEMINI_DEFAULT_MODEL
+        key = api_key or GEMINI_API_KEY
+        model_name = model or GEMINI_DEFAULT_MODEL
+        genai.configure(api_key=key)
 
-        genai.configure(api_key=api_key)
-        #If the user sent a custom key from settings, use it. Otherwise fall back to the default from .env. Then configure the Google SDK with that key.
-        
-        # Read context_messages limit from settings DB
         settings = db.query(SettingsDB).filter(SettingsDB.id == 1).first()
         context_limit = settings.context_messages if settings else 4
 
-        # Resolve session
-        session_id = request.session_id
         is_new_session = False
-
         if session_id:
-            doc = await chat_sessions_collection.find_one({"session_id": session_id})
+            doc = await chat_sessions_collection.find_one(
+                {"session_id": session_id, "is_deleted": {"$ne": True}}
+            )
             if not doc:
                 is_new_session = True
         else:
             session_id = str(uuid.uuid4())
             is_new_session = True
 
-        # Load history from chat_messages collection
         full_history = []
         if not is_new_session:
             cursor = chat_messages_collection.find(
                 {"session_id": session_id}, {"_id": 0, "role": 1, "text": 1}
-            ).sort("created_at", 1) #Sort the messages by created_at in ascending order
+            ).sort("created_at", 1)
             async for msg in cursor:
                 full_history.append({"role": msg["role"], "text": msg["text"]})
 
-        # Trim history for Gemini context window
         trimmed_history = []
         if full_history and context_limit > 0:
             max_entries = context_limit * 2
             trimmed_history = full_history[-max_entries:]
 
-        lang = request.language or "ar"
+        lang = language or "ar"
         lang_instruction = LANGUAGE_INSTRUCTIONS.get(lang, f"Answer in {lang} only.")
 
-        system_prompt = f"""
-        You are a professional AI assistant.
-        {lang_instruction}
-        Keep answers clear and well structured.
-        If a limit is required, keep response under 300 words.
-        """
+        system_prompt = (
+            "You are a professional AI assistant.\n"
+            f"{lang_instruction}\n"
+            "Keep answers clear and well structured.\n"
+            "If a limit is required, keep response under 300 words."
+        )
 
-        model = genai.GenerativeModel(
+        gen_model = genai.GenerativeModel(
             model_name=model_name,
-            system_instruction=system_prompt
+            system_instruction=system_prompt,
         )
 
         history = []
-        if trimmed_history:
-            for msg in trimmed_history:
-                role = "user" if msg["role"] == "user" else "model"
-                history.append({"role": role, "parts": [msg["text"]]})
+        for msg in trimmed_history:
+            role = "user" if msg["role"] == "user" else "model"
+            history.append({"role": role, "parts": [msg["text"]]})
 
-        chat = model.start_chat(history=history)
-        response = chat.send_message(request.message)
-        answer = response.text if response.text else "لم يتم توليد رد."
+        chat = gen_model.start_chat(history=history)
 
-        # Save to MongoDB
         now = datetime.utcnow()
+        saved_images = []
+        parts = []
+
+        for img in images:
+            if not img.filename:
+                continue
+            if img.content_type not in ALLOWED_IMAGE_MIME:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"نوع الملف {img.filename} غير مدعوم. يُسمح بـ JPEG, PNG, GIF, WEBP فقط.",
+                )
+
+            ext = os.path.splitext(img.filename)[1] or ".jpg"
+            filename = f"{uuid.uuid4().hex}{ext}"
+            filepath = os.path.join(UPLOAD_DIR, filename)
+
+            with open(filepath, "wb") as buf:
+                shutil.copyfileobj(img.file, buf)
+
+            file_size = os.path.getsize(filepath)
+            saved_images.append({
+                "path": f"/uploads/{filename}",
+                "filename": filename,
+                "content_type": img.content_type,
+                "size": file_size,
+                "uploaded_at": now,
+            })
+
+            image_bytes = open(filepath, "rb").read()
+            parts.append({"mime_type": img.content_type, "data": image_bytes})
+
+        if message:
+            parts.append(message)
+
+        response = chat.send_message(parts)
+        answer = response.text if response.text else "لم يتم توليد رد."
 
         if is_new_session:
             await chat_sessions_collection.insert_one({
                 "session_id": session_id,
-                "title": request.message[:60].strip(),
+                "title": message[:60].strip(),
                 "created_at": now,
                 "updated_at": now,
             })
 
-        # Insert each message as its own document
-        await chat_messages_collection.insert_many([
-            {"session_id": session_id, "role": "user", "text": request.message, "created_at": now, "updated_at": now},
-            {"session_id": session_id, "role": "bot", "text": answer, "created_at": now, "updated_at": now},
-        ])
+        user_doc = {
+            "session_id": session_id,
+            "role": "user",
+            "text": message,
+            "images": saved_images,
+            "created_at": now,
+            "updated_at": now,
+        }
+        bot_doc = {
+            "session_id": session_id,
+            "role": "bot",
+            "text": answer,
+            "images": [],
+            "created_at": now,
+            "updated_at": now,
+        }
+        await chat_messages_collection.insert_many([user_doc, bot_doc])
 
-        # Update session timestamp
         if not is_new_session:
             await chat_sessions_collection.update_one(
                 {"session_id": session_id},
                 {"$set": {"updated_at": now}},
             )
 
-        return ChatResponse(
-            message=request.message,
-            response=answer,
-            session_id=session_id,
+        return {
+            "message": message,
+            "response": answer,
+            "session_id": session_id,
+            "images": saved_images,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Gemini chat error: %s", e)
+        raise HTTPException(status_code=500, detail=f"Gemini API Error: {str(e)}")
+
+
+@router.post("/transcribe")
+async def transcribe_audio(
+    audio: UploadFile = File(...),
+    api_key: Optional[str] = Form(None),
+    model: Optional[str] = Form(None),
+    db: Session = Depends(get_settings_db),
+):
+    raw_mime = audio.content_type or ""
+    base_mime = raw_mime.split(";")[0].strip()
+
+    if base_mime not in ALLOWED_AUDIO_MIME:
+        raise HTTPException(
+            status_code=400,
+            detail=f"نوع الملف الصوتي غير مدعوم: {raw_mime}",
         )
 
+    try:
+        settings = db.query(SettingsDB).filter(SettingsDB.id == 1).first()
+        key = api_key or (settings.api_key if settings and settings.api_key else None) or GEMINI_API_KEY
+        model_name = model or (settings.model if settings else None) or GEMINI_DEFAULT_MODEL
+
+        genai.configure(api_key=key)
+
+        audio_bytes = await audio.read()
+        mime = base_mime
+        if mime == "audio/mp3":
+            mime = "audio/mpeg"
+
+        gen_model = genai.GenerativeModel(model_name=model_name)
+        response = gen_model.generate_content([
+            "Transcribe this audio exactly as spoken. Return ONLY the transcript text, nothing else. No labels, no quotes, no explanations.",
+            {"mime_type": mime, "data": audio_bytes},
+        ])
+
+        transcript = response.text.strip() if response.text else ""
+        return {"transcript": transcript}
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Gemini API Error: {str(e)}"
-        )
+        logger.error("Transcription error: %s", e)
+        raise HTTPException(status_code=500, detail=f"Transcription error: {str(e)}")
