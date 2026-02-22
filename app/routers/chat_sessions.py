@@ -17,7 +17,7 @@ from app.schemas import SessionSummary, SessionDetail, ChatMessage, MessageUpdat
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-
+#Display all the sessions
 @router.get("/", response_model=list[SessionSummary])
 async def list_sessions():
     sessions = []
@@ -29,7 +29,7 @@ async def list_sessions():
         sessions.append(SessionSummary(**doc))
     return sessions
 
-
+#get a specific session and guarantee images are displayed
 @router.get("/{session_id}", response_model=SessionDetail)
 async def get_session(session_id: str):
     doc = await chat_sessions_collection.find_one(
@@ -69,7 +69,7 @@ async def get_session(session_id: str):
         updated_at=doc["updated_at"],
     )
 
-
+#update a message (not used in the frontend)
 @router.put("/messages/{message_id}")
 async def update_message(message_id: str, data: MessageUpdate):
     try:
@@ -94,7 +94,7 @@ async def update_message(message_id: str, data: MessageUpdate):
 
     return {"detail": "تم تحديث الرسالة", "updated_at": now.isoformat()}
 
-
+#summarize a session
 @router.get("/{session_id}/summary")
 async def summarize_session(
     session_id: str,
@@ -201,7 +201,7 @@ async def summarize_session(
         "cached": False,
     }
 
-
+#Soft delete a session
 @router.delete("/{session_id}")
 async def delete_session(session_id: str):
     now = datetime.utcnow()

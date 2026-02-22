@@ -192,26 +192,30 @@ function formatRecordTime(ms) {
 }
 
 function startRecording() {
-    navigator.mediaDevices.getUserMedia({ audio: true })
+    navigator.mediaDevices.getUserMedia({ audio: true }) //Web API to access the microphone
         .then(function(stream) {
             audioChunks = [];
-            mediaRecorder = new MediaRecorder(stream, { mimeType: getSupportedMime() });
+            mediaRecorder = new MediaRecorder(stream, { mimeType: getSupportedMime() }); //MediaRecorder is a Web API to record audio
 
             mediaRecorder.addEventListener('dataavailable', function(e) {
-                if (e.data.size > 0) audioChunks.push(e.data);
+                if (e.data.size > 0) audioChunks.push(e.data); //audioChunks is an array of audio chunks
             });
 
             mediaRecorder.addEventListener('stop', function() {
-                stream.getTracks().forEach(function(t) { t.stop(); });
+                stream.getTracks().forEach(function(t) { t.stop(); }); //stop the stream
                 clearInterval(recordingInterval);
-                if (recordTimer) recordTimer.style.display = 'none';
+                if (recordTimer) recordTimer.style.display = 'none'; //hide the record timer
                 if (recordBtn) {
                     recordBtn.classList.remove('recording');
-                    recordBtn.classList.add('transcribing');
+                    recordBtn.classList.add('transcribing'); //add the transcribing class to the record button
                 }
 
-                var blob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-                sendForTranscription(blob, mediaRecorder.mimeType);
+                var blob = new Blob(audioChunks, { type: mediaRecorder.mimeType }); //create a blob from the audio chunks , Blob = Binary Large Object   
+                sendForTranscription(blob, mediaRecorder.mimeType); //send the audio to the server for transcription        
+                //UploadFile object فيه:  filename
+                //content_type  
+                //file (file-like object)            
+            
             });
 
             mediaRecorder.start();
@@ -526,6 +530,7 @@ if (chatInput) {
     });
 }
 
+//sending a message to the model
 /* ===== Submit ===== */
 if (chatForm) {
     chatForm.addEventListener('submit', function(e) {

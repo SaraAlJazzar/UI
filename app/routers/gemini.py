@@ -19,7 +19,7 @@ from app.database import get_settings_db, SettingsDB, chat_sessions_collection, 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-
+#chat with the model , images included
 @router.post("/chat")
 async def chat_with_gpt(
     message: str = Form(...),
@@ -168,6 +168,7 @@ async def chat_with_gpt(
         raise HTTPException(status_code=500, detail=f"Gemini API Error: {str(e)}")
 
 
+#transcribe audio
 @router.post("/transcribe")
 async def transcribe_audio(
     audio: UploadFile = File(...),

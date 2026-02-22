@@ -1,16 +1,62 @@
+version: "3.9"
+
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    command: uvicorn main:app --host 0.0.0.0 --port 8000
+
+    container_name: ai_app
+
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
     env_file:
       - .env
 
-    network_mode: host
+    environment:
+      - MYSQL_HOST=mysql
+      - MONGO_URL=mongodb://mongo:27017/
+
+    ports:
+      - "8000:8000"
 
     volumes:
       - .:/app
+      - uploads_data:/app/uploads
+
+    depends_on:
+      - mongo
+      - mysql
 
     restart: unless-stopped
+
+
+  mongo:
+    image: mongo:7
+    container_name: mongodb
+    restart: unless-stopped
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_data:/data/db
+
+
+  mysql:
+    image: mysql:8
+    container_name: mysql_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: ${MYSQL_DB_SETTINGS}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+
+volumes:
+  mongo_data:
+  mysql_data:
+  uploads_data:

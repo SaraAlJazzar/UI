@@ -19,6 +19,7 @@ const settingsSave = document.getElementById('settingsSave');
 
 let cachedSettings = { api_key: '', model: 'gemini-2.5-flash-lite', language: 'ar', context_messages: 4 };
 
+//loadSettings is a function that loads the settings from the server.
 async function loadSettings() {
     try {
         const res = await fetch('/settings/');

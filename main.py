@@ -12,7 +12,7 @@ app.include_router(settings.router, prefix="/settings", tags=["Settings"])
 app.include_router(chat_sessions.router, prefix="/sessions", tags=["Chat Sessions"])
 
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
+app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend") #give the frontend files to the client
 
 @app.get("/")
 def root():
