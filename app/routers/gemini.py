@@ -53,7 +53,7 @@ async def chat_with_gpt(
         if not is_new_session:
             cursor = chat_messages_collection.find(
                 {"session_id": session_id}, {"_id": 0, "role": 1, "text": 1}
-            ).sort("created_at", 1)
+            ).sort("created_at", 1) #sort the messages by the created_at field in ascending order (oldest to newest) , -1 for descending order (newest to oldest)
             async for msg in cursor:
                 full_history.append({"role": msg["role"], "text": msg["text"]})
 
@@ -193,7 +193,7 @@ async def transcribe_audio(
         genai.configure(api_key=key)
 
         audio_bytes = await audio.read()
-        mime = base_mime
+        mime = base_mime #Multipurpose Internet Mail Extensions.
         if mime == "audio/mp3":
             mime = "audio/mpeg"
 
@@ -201,7 +201,7 @@ async def transcribe_audio(
         response = gen_model.generate_content([
             "Transcribe this audio exactly as spoken. Return ONLY the transcript text, nothing else. No labels, no quotes, no explanations.",
             {"mime_type": mime, "data": audio_bytes},
-        ])
+])
 
         transcript = response.text.strip() if response.text else ""
         return {"transcript": transcript}

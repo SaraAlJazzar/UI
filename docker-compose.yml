@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   app:
     build:
@@ -13,12 +11,8 @@ services:
     env_file:
       - .env
 
-    environment:
-      - MYSQL_HOST=mysql
-      - MONGO_URL=mongodb://mongo:27017/
-
     ports:
-      - "8000:8000"
+      - "9091:8000"
 
     volumes:
       - .:/app
