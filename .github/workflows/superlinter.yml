@@ -1,0 +1,33 @@
+name: Super-Linter
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  super-lint:
+    name: Lint Code Base
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Super-Linter
+        uses: github/super-linter@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          # Validate all files (not just changed ones)
+          VALIDATE_ALL_CODEBASE: true
+
+          # Enable common linters
+          VALIDATE_JAVASCRIPT_ES: true
+          VALIDATE_JSON: true
+          VALIDATE_YAML: true
+          VALIDATE_DOCKERFILE: true
+
+          # Optional: ignore node_modules
+          FILTER_REGEX_EXCLUDE: node_modules/.*
