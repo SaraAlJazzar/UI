@@ -36,5 +36,5 @@ jobs:
         if: github.event_name == 'push'
         run: |
           IMAGE_NAME="${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}"
-          docker push "$IMAGE_NAME:latest"
-          docker push "$IMAGE_NAME:${{ github.sha }}"
+          docker push "fastapi-app:latest"
+          docker push "fastapi-app:${{ github.sha }}"
