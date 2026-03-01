@@ -36,6 +36,10 @@ GEMINI_DEFAULT_MODEL = os.getenv("GEMINI_DEFAULT_MODEL", "gemini-2.5-flash-lite"
 SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
 SERPER_API_URL = os.getenv("SERPER_API_URL", "https://google.serper.dev/search")
 
+# ---------- Redis ----------
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/")   
+
+
 # ---------- Gemini Chat ----------
 LANGUAGE_INSTRUCTIONS = {
     "ar": "أجب باللغة العربية فقط.",

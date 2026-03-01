@@ -6,13 +6,13 @@ import google.generativeai as genai
 from app.config import GEMINI_API_KEY, GEMINI_DEFAULT_MODEL
 from app.schemas import RAGRequest, RAGResponse, LinkInfo
 from app.services.scraper import WEBSITES, search_serper, scrape_page_content, clean_gemini_response
+from app.celery_client import celery_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/query", response_model=RAGResponse)
-async def rag_query(request: RAGRequest):
+async def _run_rag_query(request: RAGRequest):
     try:
         site_config = WEBSITES.get(request.website, WEBSITES["altibbi"])
         site_name = site_config["name"]
@@ -94,3 +94,26 @@ async def rag_query(request: RAGRequest):
     except Exception as e:
         logger.error("Unexpected RAG error: %s", e)
         raise HTTPException(status_code=500, detail=f"خطأ غير متوقع: {str(e)}")
+
+
+@router.post("/query", response_model=RAGResponse)
+async def rag_query(request: RAGRequest):
+    return await _run_rag_query(request)
+
+
+@router.post("/query/jobs")
+async def rag_query_background(request: RAGRequest):
+    async_result = celery_client.send_task(
+        "tasks.rag_query",
+        kwargs={
+            "payload": {
+                "query": request.query,
+                "num_links": request.num_links,
+                "website": request.website,
+                "api_key": request.api_key,
+                "model": request.model,
+            }
+        },
+    )
+    job_id = async_result.id
+    return {"job_id": job_id, "status": "queued"}

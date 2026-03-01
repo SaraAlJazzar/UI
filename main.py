@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from app.routers import gemini, rag, settings, chat_sessions
+from app.routers import gemini, rag, settings, chat_sessions, jobs
 
 
 app = FastAPI(title="Medical RAG & Chat")
@@ -10,6 +10,7 @@ app.include_router(gemini.router, prefix="/gemini", tags=["Gemini"])
 app.include_router(rag.router, prefix="/rag", tags=["RAG"])
 app.include_router(settings.router, prefix="/settings", tags=["Settings"])
 app.include_router(chat_sessions.router, prefix="/sessions", tags=["Chat Sessions"])
+app.include_router(jobs.router, prefix="/jobs", tags=["Jobs"])
 
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend") #give the frontend files to the client

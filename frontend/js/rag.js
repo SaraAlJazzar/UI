@@ -101,14 +101,26 @@ async function fetchRAG(query, numLinks, website) {
     if (settings.apiKey) body.api_key = settings.apiKey;
     if (settings.model) body.model = settings.model;
 
-    const res = await fetch('/rag/query', {
+    const startRes = await fetch('/rag/query/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'حدث خطأ غير متوقع');
-    return data;
+    const startData = await startRes.json();
+    if (!startRes.ok) throw new Error(startData.detail || 'حدث خطأ غير متوقع');
+
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < 180000) {
+        const jobRes = await fetch('/jobs/' + startData.job_id);
+        const jobData = await jobRes.json();
+        if (!jobRes.ok) throw new Error(jobData.detail || 'فشل متابعة حالة المهمة');
+
+        if (jobData.status === 'completed') return jobData.result;
+        if (jobData.status === 'failed') throw new Error(jobData.error || 'فشل تنفيذ المهمة');
+
+        await new Promise(resolve => setTimeout(resolve, 1200));
+    }
+    throw new Error('انتهت مهلة انتظار نتيجة RAG');
 }
 
 async function submitNormal(query, links) {

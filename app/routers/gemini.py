@@ -2,6 +2,8 @@ import os
 import uuid
 import shutil
 import logging
+import asyncio
+import base64
 from datetime import datetime
 from typing import Optional, List
 
@@ -14,10 +16,50 @@ from app.config import (
     UPLOAD_DIR, ALLOWED_IMAGE_MIME, ALLOWED_AUDIO_MIME,
     LANGUAGE_INSTRUCTIONS,
 )
-from app.database import get_settings_db, SettingsDB, chat_sessions_collection, chat_messages_collection
+from app.database import (
+    get_settings_db,
+    SettingsDB,
+    SettingsSessionLocal,
+    chat_sessions_collection,
+    chat_messages_collection,
+)
+from app.celery_client import celery_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def _transcribe_audio_bytes(
+    audio_bytes: bytes,
+    base_mime: str,
+    api_key: Optional[str] = None,
+    model: Optional[str] = None,
+) -> dict:
+    db = SettingsSessionLocal()
+    try:
+        settings = db.query(SettingsDB).filter(SettingsDB.id == 1).first()
+    finally:
+        db.close()
+
+    key = api_key or (settings.api_key if settings and settings.api_key else None) or GEMINI_API_KEY
+    model_name = model or (settings.model if settings else None) or GEMINI_DEFAULT_MODEL
+
+    genai.configure(api_key=key)
+
+    mime = base_mime
+    if mime == "audio/mp3":
+        mime = "audio/mpeg"
+
+    gen_model = genai.GenerativeModel(model_name=model_name)
+    response = await asyncio.to_thread(
+        gen_model.generate_content,
+        [
+            "Transcribe this audio exactly as spoken. Return ONLY the transcript text, nothing else. No labels, no quotes, no explanations.",
+            {"mime_type": mime, "data": audio_bytes},
+        ],
+    )
+    transcript = response.text.strip() if response.text else ""
+    return {"transcript": transcript}
 
 #chat with the model , images included
 @router.post("/chat")
@@ -174,7 +216,6 @@ async def transcribe_audio(
     audio: UploadFile = File(...),
     api_key: Optional[str] = Form(None),
     model: Optional[str] = Form(None),
-    db: Session = Depends(get_settings_db),
 ):
     raw_mime = audio.content_type or ""
     base_mime = raw_mime.split(";")[0].strip()
@@ -186,28 +227,40 @@ async def transcribe_audio(
         )
 
     try:
-        settings = db.query(SettingsDB).filter(SettingsDB.id == 1).first()
-        key = api_key or (settings.api_key if settings and settings.api_key else None) or GEMINI_API_KEY
-        model_name = model or (settings.model if settings else None) or GEMINI_DEFAULT_MODEL
-
-        genai.configure(api_key=key)
-
         audio_bytes = await audio.read()
-        mime = base_mime #Multipurpose Internet Mail Extensions.
-        if mime == "audio/mp3":
-            mime = "audio/mpeg"
-
-        gen_model = genai.GenerativeModel(model_name=model_name)
-        response = gen_model.generate_content([
-            "Transcribe this audio exactly as spoken. Return ONLY the transcript text, nothing else. No labels, no quotes, no explanations.",
-            {"mime_type": mime, "data": audio_bytes},
-])
-
-        transcript = response.text.strip() if response.text else ""
-        return {"transcript": transcript}
-
+        return await _transcribe_audio_bytes(audio_bytes, base_mime, api_key=api_key, model=model)
     except HTTPException:
         raise
     except Exception as e:
         logger.error("Transcription error: %s", e)
         raise HTTPException(status_code=500, detail=f"Transcription error: {str(e)}")
+
+
+@router.post("/transcribe/jobs")
+async def transcribe_audio_background(
+    audio: UploadFile = File(...),
+    api_key: Optional[str] = Form(None),
+    model: Optional[str] = Form(None),
+):
+    raw_mime = audio.content_type or ""
+    base_mime = raw_mime.split(";")[0].strip()
+
+    if base_mime not in ALLOWED_AUDIO_MIME:
+        raise HTTPException(
+            status_code=400,
+            detail=f"نوع الملف الصوتي غير مدعوم: {raw_mime}",
+        )
+
+    audio_bytes = await audio.read()
+    audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
+    async_result = celery_client.send_task(
+        "tasks.transcribe_audio",
+        kwargs={
+            "audio_base64": audio_base64,
+            "base_mime": base_mime,
+            "api_key": api_key,
+            "model": model,
+        },
+    )
+    job_id = async_result.id
+    return {"job_id": job_id, "status": "queued"}

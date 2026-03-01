@@ -1,8 +1,7 @@
 import asyncio
 import logging
 
-from fastapi import APIRouter, HTTPException, Depends, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, Query
 from bson import ObjectId
 from datetime import datetime
 import google.generativeai as genai
@@ -11,11 +10,127 @@ from app.config import (
     GEMINI_API_KEY, GEMINI_DEFAULT_MODEL,
     MAX_SUMMARY_MESSAGES, MAX_CONVERSATION_CHARS, GEMINI_TIMEOUT_SECONDS,
 )
-from app.database import chat_sessions_collection, chat_messages_collection, get_settings_db, SettingsDB
-from app.schemas import SessionSummary, SessionDetail, ChatMessage, MessageUpdate
+from app.database import (
+    chat_sessions_collection,
+    chat_messages_collection,
+    SettingsDB,
+    SettingsSessionLocal,
+)
+from app.schemas import SessionSummary, SessionDetail, MessageUpdate
+from app.celery_client import celery_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def _generate_summary_for_session(session_id: str, refresh: bool):
+    doc = await chat_sessions_collection.find_one(
+        {"session_id": session_id, "is_deleted": {"$ne": True}}
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="الجلسة غير موجودة")
+
+    cached = doc.get("summary")
+    if cached and not refresh:
+        cached_generated_at = cached.get("generated_at")
+        if hasattr(cached_generated_at, "isoformat"):
+            cached_generated_at = cached_generated_at.isoformat()
+        return {
+            "session_id": session_id,
+            "title": doc.get("title", ""),
+            "summary": cached.get("text", ""),
+            "generated_at": cached_generated_at,
+            "model_name": cached.get("model_name"),
+            "cached": True,
+        }
+
+    raw_messages = []
+    cursor = chat_messages_collection.find(
+        {"session_id": session_id},
+        {"_id": 0, "role": 1, "text": 1, "images": 1, "image_path": 1},
+    ).sort("created_at", -1).limit(MAX_SUMMARY_MESSAGES)
+    async for msg in cursor:
+        raw_messages.append(msg)
+
+    raw_messages.reverse()
+
+    if not raw_messages:
+        raise HTTPException(status_code=400, detail="لا توجد رسائل لتلخيصها")
+
+    lines = []
+    for msg in raw_messages:
+        label = "المستخدم" if msg["role"] == "user" else "المساعد"
+        text = msg.get("text", "")
+        has_images = bool(msg.get("images")) or bool(msg.get("image_path"))
+        if has_images:
+            text = f"{text} [تم إرفاق صورة]" if text else "[تم إرفاق صورة]"
+        lines.append(f"{label}: {text}")
+
+    conversation = "\n".join(lines)
+
+    if len(conversation) > MAX_CONVERSATION_CHARS:
+        conversation = conversation[:MAX_CONVERSATION_CHARS] + "\n... (تم اقتطاع بقية المحادثة)"
+
+    db = SettingsSessionLocal()
+    try:
+        settings = db.query(SettingsDB).filter(SettingsDB.id == 1).first()
+    finally:
+        db.close()
+
+    api_key = (settings.api_key if settings and settings.api_key else None) or GEMINI_API_KEY
+    model_name = (settings.model if settings else None) or GEMINI_DEFAULT_MODEL
+    lang = settings.language if settings else "ar"
+
+    lang_label = "العربية" if lang == "ar" else lang
+
+    prompt = (
+        f"لخّص المحادثة التالية في فقرة واحدة واضحة ومركزة.\n\n"
+        f"ركز على:\n"
+        f"- المشكلة أو السؤال الأساسي\n"
+        f"- التحليل أو المناقشة التي تمت\n"
+        f"- النتيجة النهائية أو التوصيات\n\n"
+        f"اكتب بلغة {lang_label}.\n\n"
+        f"المحادثة:\n{conversation}"
+    )
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(model_name=model_name)
+
+    try:
+        response = await asyncio.wait_for(
+            asyncio.to_thread(model.generate_content, prompt),
+            timeout=GEMINI_TIMEOUT_SECONDS,
+        )
+        summary_text = response.text if response.text else "لم يتم توليد ملخص."
+    except asyncio.TimeoutError:
+        logger.error("Summary generation timed out for session %s", session_id)
+        raise HTTPException(status_code=504, detail="انتهت مهلة توليد الملخص. حاول مرة أخرى.")
+    except Exception as e:
+        logger.error("Summary generation failed for session %s: %s", session_id, str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ أثناء توليد الملخص.")
+
+    now = datetime.utcnow()
+    summary_doc = {
+        "text": summary_text,
+        "model_name": model_name,
+        "generated_at": now,
+        "message_count": len(raw_messages),
+        "chars_sent": len(conversation),
+    }
+
+    await chat_sessions_collection.update_one(
+        {"session_id": session_id},
+        {"$set": {"summary": summary_doc}},
+    )
+
+    return {
+        "session_id": session_id,
+        "title": doc.get("title", ""),
+        "summary": summary_text,
+        "generated_at": now.isoformat(),
+        "model_name": model_name,
+        "cached": False,
+    }
 
 #Display all the sessions
 @router.get("/", response_model=list[SessionSummary])
@@ -99,107 +214,27 @@ async def update_message(message_id: str, data: MessageUpdate):
 async def summarize_session(
     session_id: str,
     refresh: bool = Query(False, description="Force regenerate summary"),
-    db: Session = Depends(get_settings_db),
 ):
-    doc = await chat_sessions_collection.find_one(
-        {"session_id": session_id, "is_deleted": {"$ne": True}}
+    return await _generate_summary_for_session(session_id, refresh)
+
+
+@router.post("/{session_id}/summary/jobs")
+async def summarize_session_background(
+    session_id: str,
+    refresh: bool = Query(False, description="Force regenerate summary"),
+):
+    existing = await chat_sessions_collection.find_one(
+        {"session_id": session_id, "is_deleted": {"$ne": True}}, {"_id": 1}
     )
-    if not doc:
+    if not existing:
         raise HTTPException(status_code=404, detail="الجلسة غير موجودة")
 
-    cached = doc.get("summary")
-    if cached and not refresh:
-        return {
-            "session_id": session_id,
-            "title": doc.get("title", ""),
-            "summary": cached.get("text", ""),
-            "generated_at": cached.get("generated_at"),
-            "model_name": cached.get("model_name"),
-            "cached": True,
-        }
-
-    raw_messages = []
-    cursor = chat_messages_collection.find(
-        {"session_id": session_id},
-        {"_id": 0, "role": 1, "text": 1, "images": 1, "image_path": 1},
-    ).sort("created_at", -1).limit(MAX_SUMMARY_MESSAGES)
-    async for msg in cursor:
-        raw_messages.append(msg)
-
-    raw_messages.reverse()
-
-    if not raw_messages:
-        raise HTTPException(status_code=400, detail="لا توجد رسائل لتلخيصها")
-
-    lines = []
-    for msg in raw_messages:
-        label = "المستخدم" if msg["role"] == "user" else "المساعد"
-        text = msg.get("text", "")
-        has_images = bool(msg.get("images")) or bool(msg.get("image_path"))
-        if has_images:
-            text = f"{text} [تم إرفاق صورة]" if text else "[تم إرفاق صورة]"
-        lines.append(f"{label}: {text}")
-
-    conversation = "\n".join(lines)
-
-    if len(conversation) > MAX_CONVERSATION_CHARS:
-        conversation = conversation[:MAX_CONVERSATION_CHARS] + "\n... (تم اقتطاع بقية المحادثة)"
-
-    settings = db.query(SettingsDB).filter(SettingsDB.id == 1).first()
-    api_key = (settings.api_key if settings and settings.api_key else None) or GEMINI_API_KEY
-    model_name = (settings.model if settings else None) or GEMINI_DEFAULT_MODEL
-    lang = settings.language if settings else "ar"
-
-    lang_label = "العربية" if lang == "ar" else lang
-
-    prompt = (
-        f"لخّص المحادثة التالية في فقرة واحدة واضحة ومركزة.\n\n"
-        f"ركز على:\n"
-        f"- المشكلة أو السؤال الأساسي\n"
-        f"- التحليل أو المناقشة التي تمت\n"
-        f"- النتيجة النهائية أو التوصيات\n\n"
-        f"اكتب بلغة {lang_label}.\n\n"
-        f"المحادثة:\n{conversation}"
+    async_result = celery_client.send_task(
+        "tasks.generate_summary",
+        args=[session_id, refresh],
     )
-
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_name=model_name)
-
-    try:
-        response = await asyncio.wait_for(
-            asyncio.to_thread(model.generate_content, prompt),
-            timeout=GEMINI_TIMEOUT_SECONDS,
-        )
-        summary_text = response.text if response.text else "لم يتم توليد ملخص."
-    except asyncio.TimeoutError:
-        logger.error("Summary generation timed out for session %s", session_id)
-        raise HTTPException(status_code=504, detail="انتهت مهلة توليد الملخص. حاول مرة أخرى.")
-    except Exception as e:
-        logger.error("Summary generation failed for session %s: %s", session_id, str(e))
-        raise HTTPException(status_code=500, detail="حدث خطأ أثناء توليد الملخص.")
-
-    now = datetime.utcnow()
-    summary_doc = {
-        "text": summary_text,
-        "model_name": model_name,
-        "generated_at": now,
-        "message_count": len(raw_messages),
-        "chars_sent": len(conversation),
-    }
-
-    await chat_sessions_collection.update_one(
-        {"session_id": session_id},
-        {"$set": {"summary": summary_doc}},
-    )
-
-    return {
-        "session_id": session_id,
-        "title": doc.get("title", ""),
-        "summary": summary_text,
-        "generated_at": now.isoformat(),
-        "model_name": model_name,
-        "cached": False,
-    }
+    job_id = async_result.id
+    return {"job_id": job_id, "status": "queued"}
 
 #Soft delete a session
 @router.delete("/{session_id}")
