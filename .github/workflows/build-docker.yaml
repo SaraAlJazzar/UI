@@ -30,7 +30,7 @@ jobs:
         if: github.event_name == 'push'
         run: |
           IMAGE_NAME="${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPO }}"
-          docker build -f ./Dockerfile -t "$IMAGE_NAME:latest" -t "$IMAGE_NAME:${{ github.sha }}" .
+          docker build -f ./Dockerfile -t "fastapi-app:latest" -t "fastapi-app:${{ github.sha }}" .
 
       - name: Push Docker image
         if: github.event_name == 'push'
