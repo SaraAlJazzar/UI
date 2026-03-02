@@ -3,7 +3,6 @@ import uuid
 import shutil
 import logging
 import asyncio
-import base64
 from datetime import datetime
 from typing import Optional, List
 
@@ -23,7 +22,6 @@ from app.database import (
     chat_sessions_collection,
     chat_messages_collection,
 )
-from app.celery_client import celery_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -234,33 +232,3 @@ async def transcribe_audio(
     except Exception as e:
         logger.error("Transcription error: %s", e)
         raise HTTPException(status_code=500, detail=f"Transcription error: {str(e)}")
-
-
-@router.post("/transcribe/jobs")
-async def transcribe_audio_background(
-    audio: UploadFile = File(...),
-    api_key: Optional[str] = Form(None),
-    model: Optional[str] = Form(None),
-):
-    raw_mime = audio.content_type or ""
-    base_mime = raw_mime.split(";")[0].strip()
-
-    if base_mime not in ALLOWED_AUDIO_MIME:
-        raise HTTPException(
-            status_code=400,
-            detail=f"نوع الملف الصوتي غير مدعوم: {raw_mime}",
-        )
-
-    audio_bytes = await audio.read()
-    audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
-    async_result = celery_client.send_task(
-        "tasks.transcribe_audio",
-        kwargs={
-            "audio_base64": audio_base64,
-            "base_mime": base_mime,
-            "api_key": api_key,
-            "model": model,
-        },
-    )
-    job_id = async_result.id
-    return {"job_id": job_id, "status": "queued"}

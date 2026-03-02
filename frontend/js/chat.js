@@ -112,25 +112,6 @@ document.addEventListener('click', function(e) {
     }
 });
 
-/* ===== Background jobs ===== */
-async function pollJob(jobId, opts) {
-    var timeoutMs = (opts && opts.timeoutMs) || 120000;
-    var intervalMs = (opts && opts.intervalMs) || 1000;
-    var started = Date.now();
-
-    while (Date.now() - started < timeoutMs) {
-        var res = await fetch('/jobs/' + jobId);
-        var data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'فشل متابعة حالة المهمة');
-
-        if (data.status === 'completed') return data.result || {};
-        if (data.status === 'failed') throw new Error(data.error || 'فشلت المهمة');
-
-        await new Promise(function(resolve) { setTimeout(resolve, intervalMs); });
-    }
-    throw new Error('انتهت مهلة انتظار المهمة');
-}
-
 /* ===== Multi-image upload handling ===== */
 if (uploadBtn) {
     uploadBtn.addEventListener('click', function() {
@@ -276,22 +257,19 @@ function sendForTranscription(blob, mimeType) {
     if (settings.apiKey) formData.append('api_key', settings.apiKey);
     if (settings.model) formData.append('model', settings.model);
 
-    fetch('/gemini/transcribe/jobs', { method: 'POST', body: formData })
+    fetch('/gemini/transcribe', { method: 'POST', body: formData })
         .then(function(res) {
             return res.json().then(function(data) {
                 return { ok: res.ok, data: data };
             });
         })
-        .then(async function(result) {
-            if (!result.ok) {
-                throw new Error(result.data.detail || 'فشل بدء تحويل الصوت');
-            }
-            return pollJob(result.data.job_id, { timeoutMs: 120000, intervalMs: 1200 });
-        })
         .then(function(result) {
+            if (!result.ok) {
+                throw new Error(result.data.detail || 'فشل تحويل الصوت');
+            }
             if (recordBtn) recordBtn.classList.remove('transcribing');
 
-            var transcript = result.transcript || '';
+            var transcript = result.data.transcript || '';
             if (transcript && chatInput) {
                 chatInput.value = chatInput.value ? chatInput.value + ' ' + transcript : transcript;
                 chatInput.focus();
@@ -641,43 +619,41 @@ function fetchSummary(forceRefresh) {
     if (summaryMeta) { summaryMeta.innerHTML = ''; summaryMeta.style.display = 'none'; }
     if (summaryRefresh) summaryRefresh.classList.add('spinning');
 
-    var startUrl = '/sessions/' + currentSessionId + '/summary/jobs';
-    if (forceRefresh) startUrl += '?refresh=true';
+    var url = '/sessions/' + currentSessionId + '/summary';
+    if (forceRefresh) url += '?refresh=true';
 
-    fetch(startUrl, { method: 'POST' })
+    fetch(url)
         .then(function(res) {
             return res.json().then(function(data) {
                 return { ok: res.ok, data: data };
             });
-        })
-        .then(async function(result) {
-            if (!result.ok) {
-                throw new Error(result.data.detail || 'فشل بدء إنشاء الملخص');
-            }
-            return pollJob(result.data.job_id, { timeoutMs: 180000, intervalMs: 1500 });
         })
         .then(function(result) {
             if (summaryLoading) summaryLoading.style.display = 'none';
             if (summaryRefresh) summaryRefresh.classList.remove('spinning');
             if (summaryContent) summaryContent.style.display = '';
 
-            if (summaryContent) {
-                summaryContent.innerHTML = formatMarkdown(result.summary || '');
+            if (!result.ok) {
+                throw new Error(result.data.detail || 'فشل إنشاء الملخص');
             }
 
-            if (summaryMeta && result.generated_at) {
+            if (summaryContent) {
+                summaryContent.innerHTML = formatMarkdown(result.data.summary);
+            }
+
+            if (summaryMeta && result.data.generated_at) {
                 summaryMeta.style.display = '';
                 var metaHtml = '';
-                if (result.cached) {
+                if (result.data.cached) {
                     metaHtml += '<span class="summary-cached-badge">من الذاكرة المؤقتة</span>';
                 }
-                if (result.model_name) {
+                if (result.data.model_name) {
                     metaHtml += '<span class="summary-meta-item">' +
                         '<svg viewBox="0 0 24 24"><path d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 1.98-.88 4.55-2.64 6.29-3.51 3.48-9.21 3.48-12.72 0-3.5-3.47-3.5-9.11 0-12.58 3.51-3.47 9.14-3.49 12.65-.06L21 3v7.12z"/></svg>' +
-                        escapeHtml(result.model_name) + '</span>';
+                        escapeHtml(result.data.model_name) + '</span>';
                 }
-                if (result.generated_at) {
-                    var d = new Date(result.generated_at);
+                if (result.data.generated_at) {
+                    var d = new Date(result.data.generated_at);
                     metaHtml += '<span class="summary-meta-item">' +
                         '<svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>' +
                         d.toLocaleString('ar') + '</span>';

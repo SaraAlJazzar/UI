@@ -17,7 +17,6 @@ from app.database import (
     SettingsSessionLocal,
 )
 from app.schemas import SessionSummary, SessionDetail, MessageUpdate
-from app.celery_client import celery_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -216,25 +215,6 @@ async def summarize_session(
     refresh: bool = Query(False, description="Force regenerate summary"),
 ):
     return await _generate_summary_for_session(session_id, refresh)
-
-
-@router.post("/{session_id}/summary/jobs")
-async def summarize_session_background(
-    session_id: str,
-    refresh: bool = Query(False, description="Force regenerate summary"),
-):
-    existing = await chat_sessions_collection.find_one(
-        {"session_id": session_id, "is_deleted": {"$ne": True}}, {"_id": 1}
-    )
-    if not existing:
-        raise HTTPException(status_code=404, detail="الجلسة غير موجودة")
-
-    async_result = celery_client.send_task(
-        "tasks.generate_summary",
-        args=[session_id, refresh],
-    )
-    job_id = async_result.id
-    return {"job_id": job_id, "status": "queued"}
 
 #Soft delete a session
 @router.delete("/{session_id}")
