@@ -8,7 +8,3 @@ from app.database.mysql import (
     get_settings_db,
     SettingsSessionLocal,
 )
-from app.database.redis import (
-    get_redis_client,
-    close_redis_client,
-)
