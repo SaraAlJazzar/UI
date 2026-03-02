@@ -12,7 +12,7 @@ services:
       - .env
 
     ports:
-      - "9091:8000"
+      - "9099:8000"
 
     volumes:
       - .:/app
@@ -30,7 +30,7 @@ services:
     container_name: mongodb
     restart: unless-stopped
     ports:
-      - "27018:27017"
+      - "27019:27017"
     volumes:
       - mongo_data:/data/db
 
@@ -45,7 +45,7 @@ services:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
-      - "3307:3306"
+      - "3309:3306"
     volumes:
       - mysql_data:/var/lib/mysql
 
